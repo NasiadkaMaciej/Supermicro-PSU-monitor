@@ -4,6 +4,9 @@
 // Cables: SDA to A4, SCL to A5 on Arduino Nano
 // Red - VCC (5V), Black - GND
 
+// Human readable, or JSON for Prometheus
+bool jsonOutputMode = true;
+
 // Configuration
 constexpr uint32_t SERIAL_BAUD = 115200;
 constexpr uint32_t I2C_CLOCK = 100000;
@@ -104,36 +107,55 @@ class SupermicroPSU {
 	}
 
 	void print() {
-		char buffer[128];
-		unsigned long timestamp = millis() / 1000;
+		if (jsonOutputMode) {
+			Serial.print(F("{\"id\":"));
+			Serial.print(_psuIndex);
+			Serial.print(F(",\"temp\":"));
+			Serial.print(_data.temperature);
+			Serial.print(F(",\"fan1\":"));
+			Serial.print(_data.fan1_rpm);
+			Serial.print(F(",\"fan2\":"));
+			Serial.print(_data.fan2_rpm);
+			Serial.print(F(",\"v_in\":"));
+			Serial.print(_data.input_voltage, 1);
+			Serial.print(F(",\"i_in\":"));
+			Serial.print(_data.input_current, 2);
+			Serial.print(F(",\"p_in\":"));
+			Serial.print(_data.input_power);
+			Serial.print(F(",\"ok\":"));
+			Serial.print(_data.dcGood ? 1 : 0);
+			Serial.println(F("}"));
+		} else {
+			char buffer[128];
+			unsigned long timestamp = millis() / 1000;
 
-		Serial.print(F("["));
-		Serial.print(timestamp);
-		Serial.print(F("s] PSU #"));
-		Serial.print(_psuIndex);
-		Serial.print(F(": "));
+			Serial.print(F("["));
+			Serial.print(timestamp);
+			Serial.print(F("s] PSU #"));
+			Serial.print(_psuIndex);
+			Serial.print(F(": "));
+			if (!_data.online) {
+				Serial.println(F("--- OFFLINE ---"));
+				return;
+			}
 
-		if (!_data.online) {
-			Serial.println(F("--- OFFLINE ---"));
-			return;
+			// Output Format: Temp | Fan1 / Fan2 | Status | Volts / Amps / Watts
+			snprintf(buffer,
+					 sizeof(buffer),
+					 "%dC | %d/%d rpm | %s | ",
+					 _data.temperature,
+					 _data.fan1_rpm,
+					 _data.fan2_rpm,
+					 _data.dcGood ? "DC OK" : "FAULT");
+			Serial.print(buffer);
+
+			Serial.print(_data.input_voltage, 0);
+			Serial.print(F("V / "));
+			Serial.print(_data.input_current, 2);
+			Serial.print(F("A / "));
+			Serial.print(_data.input_power);
+			Serial.println(F("W"));
 		}
-
-		// Output Format: Temp | Fan1 / Fan2 | Status | Volts / Amps / Watts
-		snprintf(buffer,
-				 sizeof(buffer),
-				 "%dC | %d/%d rpm | %s | ",
-				 _data.temperature,
-				 _data.fan1_rpm,
-				 _data.fan2_rpm,
-				 _data.dcGood ? "DC OK" : "FAULT");
-		Serial.print(buffer);
-
-		Serial.print(_data.input_voltage, 0);
-		Serial.print(F("V / "));
-		Serial.print(_data.input_current, 2);
-		Serial.print(F("A / "));
-		Serial.print(_data.input_power);
-		Serial.println(F("W"));
 	}
 };
 
